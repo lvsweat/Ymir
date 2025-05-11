@@ -29,7 +29,6 @@
 #include <chrono>
 #include <filesystem>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 namespace app {
@@ -62,8 +61,6 @@ private:
 
     SharedContext m_context;
     SDL_PropertiesID m_fileDialogProps;
-
-    std::thread m_emuThread;
 
     AudioSystem m_audioSystem;
 

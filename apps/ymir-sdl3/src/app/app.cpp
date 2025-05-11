@@ -1288,26 +1288,12 @@ void App::RunEmulator() {
     auto t = clk::now();
     m_mouseHideTime = t;
 
-    // Start emulator thread
-    m_emuThread = std::thread([&] { EmulatorThread(); });
-    ScopeGuard sgStopEmuThread{[&] {
-        // TODO: fix this hacky mess
-        // HACK: unpause, unsilence audio system and set frame request signal in order to unlock the emulator thread if
-        // it is waiting for free space in the audio buffer due to being paused
-        paused = false;
-        m_emuProcessEvent.Set();
-        m_audioSystem.SetSilent(false);
-        screen.frameRequestEvent.Set();
-        m_context.EnqueueEvent(events::emu::SetPaused(false));
-        m_context.EnqueueEvent(events::emu::Shutdown());
-        if (m_emuThread.joinable()) {
-            m_emuThread.join();
-        }
-    }};
-
     SDL_ShowWindow(screen.window);
 
     std::array<GUIEvent, 64> evts{};
+    std::array<EmuEvent, 64> emuEvts{};
+
+    bool frameStep = false;
 
 #if Ymir_ENABLE_IMGUI_DEMO
     bool showImGuiDemoWindow = false;
@@ -1546,6 +1532,109 @@ void App::RunEmulator() {
 
             case EvtType::StateSaved: PersistSaveState(std::get<uint32>(evt.value)); break;
             }
+        }
+
+        // Process all pending events
+        const size_t emuEvtCount = m_context.eventQueues.emulator.try_dequeue_bulk(emuEvts.begin(), emuEvts.size());
+        for (size_t i = 0; i < emuEvtCount; i++) {
+            EmuEvent &evt = emuEvts[i];
+            using enum EmuEvent::Type;
+            switch (evt.type) {
+            case FactoryReset: m_context.saturn.FactoryReset(); break;
+            case HardReset: m_context.saturn.Reset(true); break;
+            case SoftReset: m_context.saturn.Reset(false); break;
+            case SetResetButton: m_context.saturn.SMPC.SetResetButtonState(std::get<bool>(evt.value)); break;
+
+            case SetPaused:
+                paused = std::get<bool>(evt.value);
+                m_audioSystem.SetSilent(paused);
+                break;
+            case ForwardFrameStep:
+                frameStep = true;
+                paused = false;
+                m_audioSystem.SetSilent(false);
+                break;
+            case ReverseFrameStep:
+                frameStep = true;
+                paused = false;
+                m_context.rewinding = true;
+                m_audioSystem.SetSilent(false);
+                break;
+
+            case OpenCloseTray:
+                if (m_context.saturn.IsTrayOpen()) {
+                    m_context.saturn.CloseTray();
+                } else {
+                    m_context.saturn.OpenTray();
+                }
+                break;
+            case LoadDisc:
+                // LoadDiscImage locks the disc mutex
+                LoadDiscImage(std::get<std::filesystem::path>(evt.value));
+                LoadSaveStates();
+                break;
+            case EjectDisc: //
+            {
+                std::unique_lock lock{m_context.locks.disc};
+                m_context.saturn.EjectDisc();
+                m_context.state.loadedDiscImagePath.clear();
+                break;
+            }
+            case RemoveCartridge: //
+            {
+                std::unique_lock lock{m_context.locks.cart};
+                m_context.saturn.RemoveCartridge();
+                break;
+            }
+
+            case ReplaceInternalBackupMemory:
+                m_context.saturn.mem.GetInternalBackupRAM().CopyFrom(std::get<ymir::bup::BackupMemory>(evt.value));
+                break;
+            case ReplaceExternalBackupMemory:
+                if (auto *cart = m_context.saturn.GetCartridge().As<ymir::cart::CartType::BackupMemory>()) {
+                    cart->CopyBackupMemoryFrom(std::get<ymir::bup::BackupMemory>(evt.value));
+                }
+                break;
+
+            case RunFunction: std::get<std::function<void(SharedContext &)>>(evt.value)(m_context); break;
+
+            case SetThreadPriority: util::BoostCurrentThreadPriority(std::get<bool>(evt.value)); break;
+
+            case Shutdown: return;
+            }
+        }
+
+        // Emulate one frame
+        if (!paused) {
+            if (m_audioSystem.IsSync()) {
+                m_emuProcessEvent.Wait(true);
+            }
+            const bool rewindEnabled = m_context.rewindBuffer.IsRunning();
+            bool doRunFrame = true;
+            if (rewindEnabled && m_context.rewinding) {
+                if (m_context.rewindBuffer.PopState()) {
+                    if (!m_context.saturn.LoadState(m_context.rewindBuffer.NextState)) {
+                        doRunFrame = false;
+                    }
+                } else {
+                    doRunFrame = false;
+                }
+            }
+
+            if (doRunFrame) [[likely]] {
+                m_context.saturn.RunFrame();
+            }
+
+            if (rewindEnabled && !m_context.rewinding) {
+                m_context.saturn.SaveState(m_context.rewindBuffer.NextState);
+                m_context.rewindBuffer.ProcessState();
+            }
+        }
+        if (frameStep) {
+            frameStep = false;
+            paused = true;
+            m_context.rewinding = false;
+            m_audioSystem.SetSilent(true);
         }
 
         // Update display
@@ -2194,122 +2283,6 @@ void App::RunEmulator() {
 end_loop:; // the semicolon is not a typo!
 
     // Everything is cleaned up automatically by ScopeGuards
-}
-
-void App::EmulatorThread() {
-    util::SetCurrentThreadName("Emulator thread");
-    util::BoostCurrentThreadPriority(m_context.settings.general.boostEmuThreadPriority);
-
-    std::array<EmuEvent, 64> evts{};
-
-    bool paused = false;
-    bool frameStep = false;
-
-    while (true) {
-        // Process all pending events
-        const size_t evtCount = paused ? m_context.eventQueues.emulator.wait_dequeue_bulk(evts.begin(), evts.size())
-                                       : m_context.eventQueues.emulator.try_dequeue_bulk(evts.begin(), evts.size());
-        for (size_t i = 0; i < evtCount; i++) {
-            EmuEvent &evt = evts[i];
-            using enum EmuEvent::Type;
-            switch (evt.type) {
-            case FactoryReset: m_context.saturn.FactoryReset(); break;
-            case HardReset: m_context.saturn.Reset(true); break;
-            case SoftReset: m_context.saturn.Reset(false); break;
-            case SetResetButton: m_context.saturn.SMPC.SetResetButtonState(std::get<bool>(evt.value)); break;
-
-            case SetPaused:
-                paused = std::get<bool>(evt.value);
-                m_audioSystem.SetSilent(paused);
-                break;
-            case ForwardFrameStep:
-                frameStep = true;
-                paused = false;
-                m_audioSystem.SetSilent(false);
-                break;
-            case ReverseFrameStep:
-                frameStep = true;
-                paused = false;
-                m_context.rewinding = true;
-                m_audioSystem.SetSilent(false);
-                break;
-
-            case OpenCloseTray:
-                if (m_context.saturn.IsTrayOpen()) {
-                    m_context.saturn.CloseTray();
-                } else {
-                    m_context.saturn.OpenTray();
-                }
-                break;
-            case LoadDisc:
-                // LoadDiscImage locks the disc mutex
-                LoadDiscImage(std::get<std::filesystem::path>(evt.value));
-                LoadSaveStates();
-                break;
-            case EjectDisc: //
-            {
-                std::unique_lock lock{m_context.locks.disc};
-                m_context.saturn.EjectDisc();
-                m_context.state.loadedDiscImagePath.clear();
-                break;
-            }
-            case RemoveCartridge: //
-            {
-                std::unique_lock lock{m_context.locks.cart};
-                m_context.saturn.RemoveCartridge();
-                break;
-            }
-
-            case ReplaceInternalBackupMemory:
-                m_context.saturn.mem.GetInternalBackupRAM().CopyFrom(std::get<ymir::bup::BackupMemory>(evt.value));
-                break;
-            case ReplaceExternalBackupMemory:
-                if (auto *cart = m_context.saturn.GetCartridge().As<ymir::cart::CartType::BackupMemory>()) {
-                    cart->CopyBackupMemoryFrom(std::get<ymir::bup::BackupMemory>(evt.value));
-                }
-                break;
-
-            case RunFunction: std::get<std::function<void(SharedContext &)>>(evt.value)(m_context); break;
-
-            case SetThreadPriority: util::BoostCurrentThreadPriority(std::get<bool>(evt.value)); break;
-
-            case Shutdown: return;
-            }
-        }
-
-        // Emulate one frame
-        if (!paused) {
-            if (m_audioSystem.IsSync()) {
-                m_emuProcessEvent.Wait(true);
-            }
-            const bool rewindEnabled = m_context.rewindBuffer.IsRunning();
-            bool doRunFrame = true;
-            if (rewindEnabled && m_context.rewinding) {
-                if (m_context.rewindBuffer.PopState()) {
-                    if (!m_context.saturn.LoadState(m_context.rewindBuffer.NextState)) {
-                        doRunFrame = false;
-                    }
-                } else {
-                    doRunFrame = false;
-                }
-            }
-
-            if (doRunFrame) [[likely]] {
-                m_context.saturn.RunFrame();
-            }
-
-            if (rewindEnabled && !m_context.rewinding) {
-                m_context.saturn.SaveState(m_context.rewindBuffer.NextState);
-                m_context.rewindBuffer.ProcessState();
-            }
-        }
-        if (frameStep) {
-            frameStep = false;
-            paused = true;
-            m_context.rewinding = false;
-            m_audioSystem.SetSilent(true);
-        }
-    }
 }
 
 void App::RebindInputs() {
