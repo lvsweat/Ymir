@@ -1469,9 +1469,6 @@ void App::RunEmulator() {
         // Process all axis changes
         m_context.inputContext.ProcessAxes();
 
-        // Make emulator thread process next frame
-        m_emuProcessEvent.Set();
-
         // Process GUI events
         const size_t evtCount = m_context.eventQueues.gui.try_dequeue_bulk(evts.begin(), evts.size());
         for (size_t i = 0; i < evtCount; i++) {
@@ -1606,9 +1603,6 @@ void App::RunEmulator() {
 
         // Emulate one frame
         if (!paused) {
-            if (m_audioSystem.IsSync()) {
-                m_emuProcessEvent.Wait(true);
-            }
             const bool rewindEnabled = m_context.rewindBuffer.IsRunning();
             bool doRunFrame = true;
             if (rewindEnabled && m_context.rewinding) {
