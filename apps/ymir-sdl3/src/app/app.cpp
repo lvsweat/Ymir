@@ -165,15 +165,6 @@ int App::Run(const CommandLineOptions &options) {
     } else {
         m_context.profile.UsePortableProfilePath();
     }
-    if (!m_context.profile.CheckFolders()) {
-        std::error_code error{};
-        if (!m_context.profile.CreateFolders(error)) {
-            devlog::error<grp::base>("Could not create profile folders: {}", error.message());
-            return -1;
-        }
-    }
-
-    devlog::debug<grp::base>("Profile directory: {}", m_context.profile.GetPath(ProfilePath::Root));
 
     {
         auto &inputSettings = m_context.settings.input;
@@ -202,6 +193,16 @@ int App::Run(const CommandLineOptions &options) {
             devlog::warn<grp::base>("Failed to save settings: {}", result.string());
         }
     }};
+
+    if (!m_context.profile.CheckFolders()) {
+        std::error_code error{};
+        if (!m_context.profile.CreateFolders(error)) {
+            devlog::error<grp::base>("Could not create profile folders: {}", error.message());
+            return -1;
+        }
+    }
+
+    devlog::debug<grp::base>("Profile directory: {}", m_context.profile.GetPath(ProfilePath::Root));
 
     m_context.saturn.UsePreferredRegion();
 

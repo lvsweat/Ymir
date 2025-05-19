@@ -7,9 +7,11 @@
 - Core: Performance improvements, especially for ARM builds. (@Wunkolo)
 - Input: Implemented 3D Control Pad. (#28)
 - Media: Preliminary support for CHD files. (#48)
+- Media: Support multi-indexed audio tracks (BIN/CUE only). (#58)
 
 ### Fixes
 
+- App: Customized profile paths are now created at the specified location instead of the default. (#119, #126; @lvsweat)
 - CD Block: Fix audio track sector sizes. Fixes some CD audio track playback glitches with certain images (particularly MDF/MDS).
 
 
