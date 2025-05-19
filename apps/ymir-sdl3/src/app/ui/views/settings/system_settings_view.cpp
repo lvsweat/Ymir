@@ -38,6 +38,30 @@ void SystemSettingsView::Display() {
     // -----------------------------------------------------------------------------------------------------------------
 
     ImGui::PushFont(m_context.fonts.sansSerif.large.bold);
+    ImGui::SeparatorText("Locale");
+    ImGui::PopFont();
+
+    if (ImGui::BeginTable("sys_locale", 2, ImGuiTableFlags_SizingFixedFit)) {
+        ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed, 0);
+        ImGui::TableSetupColumn("##value", ImGuiTableColumnFlags_WidthStretch);
+
+        ImGui::TableNextRow();
+        if (ImGui::TableNextColumn()) {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Locale");
+            widgets::ExplanationTooltip("Changing this option will change the language used across Ymir's UI.",
+                                        m_context.displayScale);
+        }
+        if (ImGui::TableNextColumn()) {
+            ui::widgets::LocaleSelector(m_context);
+        }
+
+        ImGui::EndTable();
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+
+    ImGui::PushFont(m_context.fonts.sansSerif.large.bold);
     ImGui::SeparatorText("Region");
     ImGui::PopFont();
 

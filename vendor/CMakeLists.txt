@@ -26,6 +26,10 @@ message(STATUS "Adding vendored libraries")
 message(STATUS "==> {fmt}")
 add_subdirectory(fmt EXCLUDE_FROM_ALL)
 
+# {nlohmann_json} - https://github.com/nlohmann/json
+message(STATUS "==> {nlohmann_json}")
+add_subdirectory(nlohmann_json EXCLUDE_FROM_ALL)
+
 # mio - https://github.com/vimpunk/mio
 # Notes:
 # - Using StrikerX3's fork instead

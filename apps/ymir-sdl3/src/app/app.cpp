@@ -112,6 +112,7 @@
 #include <serdes/state_cereal.hpp>
 
 #include <util/file_loader.hpp>
+#include <util/i18n.hpp>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_events.h>
@@ -143,6 +144,8 @@ CMRC_DECLARE(Ymir_sdl3_rc);
 using clk = std::chrono::steady_clock;
 
 namespace app {
+
+    i18n::i18n& locale = i18n::i18n::GetInstance();
 
 App::App()
     : m_systemStateWindow(m_context)
@@ -347,6 +350,10 @@ void App::RunEmulator() {
                 screen.frameInterval =
                     std::chrono::duration_cast<clk::duration>(std::chrono::duration<double>(kNTSCFrameInterval));
             }
+        });
+
+    m_context.saturn.configuration.system.locale.ObserveAndNotify(
+        [&](core::config::sys::Locale newLocale) { i18n::i18n::GetInstance().SetLocale(newLocale);
         });
 
     // ---------------------------------
@@ -1575,27 +1582,27 @@ void App::RunEmulator() {
             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
             if (ImGui::BeginMainMenuBar()) {
                 ImGui::PopStyleVar();
-                if (ImGui::BeginMenu("File")) {
+                if (ImGui::BeginMenu(locale.GetPhrase("menuFile").data())) {
                     // CD drive
-                    if (ImGui::MenuItem("Load disc image",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuFileLoadDiscImage").data(),
                                         input::ToShortcut(inputContext, actions::cd_drive::LoadDisc).c_str())) {
                         OpenLoadDiscDialog();
                     }
-                    if (ImGui::MenuItem("Open/close tray",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuFileToggleTray").data(),
                                         input::ToShortcut(inputContext, actions::cd_drive::OpenCloseTray).c_str())) {
                         m_context.EnqueueEvent(events::emu::OpenCloseTray());
                     }
-                    if (ImGui::MenuItem("Eject disc",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuFileEjectDisc").data(),
                                         input::ToShortcut(inputContext, actions::cd_drive::EjectDisc).c_str())) {
                         m_context.EnqueueEvent(events::emu::EjectDisc());
                     }
 
                     ImGui::Separator();
 
-                    if (ImGui::MenuItem("Open profile directory")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuFileOpenProfileDir").data())) {
                         SDL_OpenURL(fmt::format("file:///{}", m_context.profile.GetPath(ProfilePath::Root)).c_str());
                     }
-                    if (ImGui::MenuItem("Open save states directory", nullptr, nullptr,
+                    if (ImGui::MenuItem(locale.GetPhrase("menuFileOpenSaveStatesDir").data(), nullptr, nullptr,
                                         !m_context.state.loadedDiscImagePath.empty())) {
                         auto path = m_context.profile.GetPath(ProfilePath::SaveStates) /
                                     ToString(m_context.saturn.GetDiscHash());
@@ -1605,20 +1612,23 @@ void App::RunEmulator() {
 
                     ImGui::Separator();
 
-                    ImGui::MenuItem("Backup memory manager", nullptr, &m_bupMgrWindow.Open);
+                    ImGui::MenuItem(locale.GetPhrase("menuFileBackupMemManager").data(), nullptr,
+                                    &m_bupMgrWindow.Open);
 
                     ImGui::Separator();
 
-                    if (ImGui::MenuItem("Exit", "Alt+F4")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuFileExit").data(), "Alt+F4")) {
                         SDL_Event quitEvent{.type = SDL_EVENT_QUIT};
                         SDL_PushEvent(&quitEvent);
                     }
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("View")) {
+                if (ImGui::BeginMenu(locale.GetPhrase("menuView").data())) {
                     auto &videoSettings = m_context.settings.video;
-                    ImGui::MenuItem("Force integer scaling", nullptr, &videoSettings.forceIntegerScaling);
-                    ImGui::MenuItem("Force aspect ratio", nullptr, &videoSettings.forceAspectRatio);
+                    ImGui::MenuItem(locale.GetPhrase("menuViewIntegerScaling").data(), nullptr,
+                                    &videoSettings.forceIntegerScaling);
+                    ImGui::MenuItem(locale.GetPhrase("menuViewAspectRatio").data(), nullptr,
+                                    &videoSettings.forceAspectRatio);
                     if (ImGui::SmallButton("4:3")) {
                         videoSettings.forcedAspect = 4.0 / 3.0;
                         m_context.settings.MakeDirty();
@@ -1630,7 +1640,7 @@ void App::RunEmulator() {
                     }
 
                     bool fullScreen = m_context.settings.video.fullScreen.Get();
-                    if (ImGui::MenuItem("Full screen",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuViewFullScreen").data(),
                                         input::ToShortcut(inputContext, actions::general::ToggleFullScreen).c_str(),
                                         &fullScreen)) {
                         videoSettings.fullScreen = fullScreen;
@@ -1639,8 +1649,9 @@ void App::RunEmulator() {
 
                     ImGui::Separator();
 
-                    ImGui::MenuItem("Auto-fit window to screen", nullptr, &videoSettings.autoResizeWindow);
-                    if (ImGui::MenuItem("Fit window to screen", nullptr, nullptr,
+                    ImGui::MenuItem(locale.GetPhrase("menuViewAutoFitWindow").data(), nullptr,
+                                    &videoSettings.autoResizeWindow);
+                    if (ImGui::MenuItem(locale.GetPhrase("menuViewFitWindow").data(), nullptr, nullptr,
                                         !videoSettings.displayVideoOutputInWindow)) {
                         fitWindowToScreenNow = true;
                     }
@@ -1648,7 +1659,7 @@ void App::RunEmulator() {
                     ImGui::Separator();
 
                     if (ImGui::MenuItem(
-                            "Windowed video output",
+                            locale.GetPhrase("menuViewWindowedOutput").data(),
                             input::ToShortcut(inputContext, actions::general::ToggleWindowedVideoOutput).c_str(),
                             &videoSettings.displayVideoOutputInWindow)) {
                         fitWindowToScreenNow = true;
@@ -1656,18 +1667,18 @@ void App::RunEmulator() {
                     }
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("System")) {
-                    ImGui::MenuItem("System state", nullptr, &m_systemStateWindow.Open);
+                if (ImGui::BeginMenu(locale.GetPhrase("menuSystem").data())) {
+                    ImGui::MenuItem(locale.GetPhrase("menuSystemState").data(), nullptr, &m_systemStateWindow.Open);
 
                     ImGui::Separator();
 
                     // Resets
                     {
-                        if (ImGui::MenuItem("Soft reset",
+                        if (ImGui::MenuItem(locale.GetPhrase("menuSystemSoftReset").data(),
                                             input::ToShortcut(inputContext, actions::sys::SoftReset).c_str())) {
                             m_context.EnqueueEvent(events::emu::SoftReset());
                         }
-                        if (ImGui::MenuItem("Hard reset",
+                        if (ImGui::MenuItem(locale.GetPhrase("menuSystemHardReset").data(),
                                             input::ToShortcut(inputContext, actions::sys::HardReset).c_str())) {
                             m_context.EnqueueEvent(events::emu::HardReset());
                         }
@@ -1682,16 +1693,27 @@ void App::RunEmulator() {
                     // Video standard and region
                     {
                         ImGui::AlignTextToFramePadding();
-                        ImGui::TextUnformatted("Video standard:");
+                        ImGui::TextUnformatted(locale.GetPhrase("menuSystemLocale").data());
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("(?)");
+                        if (ImGui::BeginItemTooltip()) {
+                            ImGui::TextUnformatted(locale.GetPhrase("menuSystemLocaleTip").data());
+                            ImGui::EndTooltip();
+                        }
+                        ImGui::SameLine();
+                        ui::widgets::LocaleSelector(m_context);
+
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::TextUnformatted(locale.GetPhrase("menuSystemVideoStandard").data());
                         ImGui::SameLine();
                         ui::widgets::VideoStandardSelector(m_context);
 
                         ImGui::AlignTextToFramePadding();
-                        ImGui::TextUnformatted("Region");
+                        ImGui::TextUnformatted(locale.GetPhrase("menuSystemRegion").data());
                         ImGui::SameLine();
                         ImGui::TextDisabled("(?)");
                         if (ImGui::BeginItemTooltip()) {
-                            ImGui::TextUnformatted("Changing this option will cause a hard reset");
+                            ImGui::TextUnformatted(locale.GetPhrase("menuSystemRegionTip").data());
                             ImGui::EndTooltip();
                         }
                         ImGui::SameLine();
@@ -1703,25 +1725,25 @@ void App::RunEmulator() {
                     // Cartridge slot
                     {
                         ImGui::BeginDisabled();
-                        ImGui::TextUnformatted("Cartridge port: ");
+                        ImGui::TextUnformatted(locale.GetPhrase("menuSystemCartPort").data());
                         ImGui::SameLine(0, 0);
                         ui::widgets::CartridgeInfo(m_context);
                         ImGui::EndDisabled();
 
-                        if (ImGui::MenuItem("Insert backup RAM...")) {
+                        if (ImGui::MenuItem(locale.GetPhrase("menuSystemInsertBackupRAM").data())) {
                             OpenBackupMemoryCartFileDialog();
                         }
-                        if (ImGui::MenuItem("Insert 8 Mbit DRAM")) {
+                        if (ImGui::MenuItem(locale.GetPhrase("menuSystemInsert8BitDRAM").data())) {
                             m_context.EnqueueEvent(events::emu::Insert8MbitDRAMCartridge());
                         }
-                        if (ImGui::MenuItem("Insert 32 Mbit DRAM")) {
+                        if (ImGui::MenuItem(locale.GetPhrase("menuSystemInsert32BitDRAM").data())) {
                             m_context.EnqueueEvent(events::emu::Insert32MbitDRAMCartridge());
                         }
-                        if (ImGui::MenuItem("Insert 16 Mbit ROM...")) {
+                        if (ImGui::MenuItem(locale.GetPhrase("menuSystemInsert16BitROM").data())) {
                             OpenROMCartFileDialog();
                         }
 
-                        if (ImGui::MenuItem("Remove cartridge")) {
+                        if (ImGui::MenuItem(locale.GetPhrase("menuSystemRemoveCart").data())) {
                             m_context.EnqueueEvent(events::emu::RemoveCartridge());
                         }
                     }
@@ -1735,20 +1757,20 @@ void App::RunEmulator() {
 
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Emulation")) {
+                if (ImGui::BeginMenu(locale.GetPhrase("menuEmulation").data())) {
                     bool rewindEnabled = m_context.settings.general.enableRewindBuffer;
 
-                    if (ImGui::MenuItem("Pause/resume",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuEmulationPauseResume").data(),
                                         input::ToShortcut(inputContext, actions::emu::PauseResume).c_str())) {
                         paused = !paused;
                         m_context.EnqueueEvent(events::emu::SetPaused(paused));
                     }
-                    if (ImGui::MenuItem("Forward frame step",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuEmulationForwardFrame").data(),
                                         input::ToShortcut(inputContext, actions::emu::ForwardFrameStep).c_str())) {
                         paused = true;
                         m_context.EnqueueEvent(events::emu::ForwardFrameStep());
                     }
-                    if (ImGui::MenuItem("Reverse frame step",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuEmulationReverseFrame").data(),
                                         input::ToShortcut(inputContext, actions::emu::ReverseFrameStep).c_str(),
                                         nullptr, rewindEnabled)) {
                         if (rewindEnabled) {
@@ -1756,65 +1778,69 @@ void App::RunEmulator() {
                             m_context.EnqueueEvent(events::emu::ReverseFrameStep());
                         }
                     }
-                    if (ImGui::MenuItem("Rewind buffer",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuEmulationRewindBuffer").data(),
                                         input::ToShortcut(inputContext, actions::emu::ToggleRewindBuffer).c_str(),
                                         &rewindEnabled)) {
                         ToggleRewindBuffer();
                     }
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Settings")) {
-                    ImGui::MenuItem("Settings", input::ToShortcut(inputContext, actions::general::OpenSettings).c_str(),
+                if (ImGui::BeginMenu(locale.GetPhrase("menuSettings").data())) {
+                    ImGui::MenuItem(locale.GetPhrase("menuSettings").data(),
+                                    input::ToShortcut(inputContext, actions::general::OpenSettings).c_str(),
                                     &m_settingsWindow.Open);
                     ImGui::Separator();
-                    if (ImGui::MenuItem("General")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsGeneral").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::General);
                     }
-                    if (ImGui::MenuItem("Hotkeys")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsHotkeys").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::Hotkeys);
                     }
-                    if (ImGui::MenuItem("System")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsSystem").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::System);
                     }
                     if (ImGui::MenuItem("IPL")) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::IPL);
                     }
-                    if (ImGui::MenuItem("Input")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsInput").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::Input);
                     }
-                    if (ImGui::MenuItem("Video")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsVideo").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::Video);
                     }
-                    if (ImGui::MenuItem("Audio")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsAudio").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::Audio);
                     }
-                    if (ImGui::MenuItem("Cartridge")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsCart").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::Cartridge);
                     }
-                    if (ImGui::MenuItem("CD Block")) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuSettingsCDBlock").data())) {
                         m_settingsWindow.OpenTab(ui::SettingsTab::CDBlock);
                     }
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Debug")) {
+                if (ImGui::BeginMenu(locale.GetPhrase("menuDebug").data())) {
                     bool debugTrace = m_context.saturn.IsDebugTracingEnabled();
-                    if (ImGui::MenuItem("Enable tracing",
-                                        input::ToShortcut(inputContext, actions::dbg::ToggleDebugTrace).c_str(),
+                    if (ImGui::MenuItem(locale.GetPhrase("menuDebugEnableTracing").data(),
+                                        input::ToShortcut(inputContext, actions::dbg::ToggleDebugTrace).data(),
                                         &debugTrace)) {
                         m_context.EnqueueEvent(events::emu::SetDebugTrace(debugTrace));
                     }
                     ImGui::Separator();
-                    if (ImGui::MenuItem("Open memory viewer", nullptr)) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuDebugOpenMemViewer").data(), nullptr)) {
                         OpenMemoryViewer();
                     }
-                    if (ImGui::BeginMenu("Memory viewers")) {
+                    if (ImGui::BeginMenu(locale.GetPhrase("menuMemViewers").data())) {
                         for (auto &memView : m_memoryViewerWindows) {
-                            ImGui::MenuItem(fmt::format("Memory viewer #{}", memView.Index() + 1).c_str(), nullptr,
+                            ImGui::MenuItem(
+                                fmt::format("Memory viewer #{}", memView.Index() + 1)
+                                    .c_str(),
+                                nullptr,
                                             &memView.Open);
                         }
                         ImGui::EndMenu();
                     }
-                    if (ImGui::MenuItem("Dump all memory",
+                    if (ImGui::MenuItem(locale.GetPhrase("menuDumpMem").data(),
                                         input::ToShortcut(inputContext, actions::dbg::DumpMemory).c_str())) {
                         m_context.EnqueueEvent(events::emu::DumpMemory());
                     }
@@ -1822,26 +1848,27 @@ void App::RunEmulator() {
 
                     auto sh2Menu = [&](const char *name, ui::SH2WindowSet &set) {
                         if (ImGui::BeginMenu(name)) {
-                            ImGui::MenuItem("[WIP] Debugger", nullptr, &set.debugger.Open);
-                            ImGui::MenuItem("Interrupts", nullptr, &set.interrupts.Open);
-                            ImGui::MenuItem("Interrupt trace", nullptr, &set.interruptTrace.Open);
-                            ImGui::MenuItem("Cache", nullptr, &set.cache.Open);
-                            ImGui::MenuItem("Division unit (DIVU)", nullptr, &set.divisionUnit.Open);
-                            ImGui::MenuItem("Timers (FRT and WDT)", nullptr, &set.timers.Open);
-                            ImGui::MenuItem("DMA Controller (DMAC)", nullptr, &set.dmaController.Open);
-                            ImGui::MenuItem("DMA Controller trace", nullptr, &set.dmaControllerTrace.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuDebugger").data(), nullptr, &set.debugger.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuInterrupts").data(), nullptr, &set.interrupts.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuInterruptTrace").data(), nullptr, &set.interruptTrace.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuCache").data(), nullptr, &set.cache.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuDivUnit").data(), nullptr, &set.divisionUnit.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuTimer").data(), nullptr, &set.timers.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuDMA").data(), nullptr, &set.dmaController.Open);
+                            ImGui::MenuItem(locale.GetPhrase("menuSHMenuDMATrace").data(), nullptr, &set.dmaControllerTrace.Open);
                             ImGui::EndMenu();
                         }
                     };
-                    sh2Menu("Master SH2", m_masterSH2WindowSet);
-                    sh2Menu("Slave SH2", m_slaveSH2WindowSet);
+                    sh2Menu(locale.GetPhrase("menuHostSH").data(), m_masterSH2WindowSet);
+                    sh2Menu(locale.GetPhrase("menuWorkerSH").data(), m_slaveSH2WindowSet);
 
                     if (ImGui::BeginMenu("SCU")) {
-                        ImGui::MenuItem("Registers", nullptr, &m_scuWindowSet.regs.Open);
+                        ImGui::MenuItem(locale.GetPhrase("menuSCURegisters").data(), nullptr, &m_scuWindowSet.regs.Open);
                         ImGui::MenuItem("DSP", nullptr, &m_scuWindowSet.dsp.Open);
                         ImGui::MenuItem("DMA", nullptr, &m_scuWindowSet.dma.Open);
-                        ImGui::MenuItem("DMA trace", nullptr, &m_scuWindowSet.dmaTrace.Open);
-                        ImGui::MenuItem("Interrupt trace", nullptr, &m_scuWindowSet.intrTrace.Open);
+                        ImGui::MenuItem(locale.GetPhrase("menuSCUDMATrace").data(), nullptr, &m_scuWindowSet.dmaTrace.Open);
+                        ImGui::MenuItem(locale.GetPhrase("menuSCUInterruptTrace").data(), nullptr,
+                                        &m_scuWindowSet.intrTrace.Open);
                         ImGui::EndMenu();
                     }
 
@@ -1854,9 +1881,10 @@ void App::RunEmulator() {
                             }
                         };
 
-                        ImGui::MenuItem("Layers", nullptr, &m_vdpWindowSet.vdp2Layers.Open);
+                        ImGui::MenuItem(locale.GetPhrase("menuVDPLayers").data(), nullptr,
+                                        &m_vdpWindowSet.vdp2Layers.Open);
                         ImGui::Indent();
-                        layerMenuItem("Sprite", vdp::VDP::Layer::Sprite);
+                        layerMenuItem(locale.GetPhrase("menuVDPSprite").data(), vdp::VDP::Layer::Sprite);
                         layerMenuItem("RBG0", vdp::VDP::Layer::RBG0);
                         layerMenuItem("NBG0/RBG1", vdp::VDP::Layer::NBG0_RBG1);
                         layerMenuItem("NBG1/EXBG", vdp::VDP::Layer::NBG1_EXBG);
@@ -1865,20 +1893,20 @@ void App::RunEmulator() {
                         ImGui::Unindent();
                         ImGui::EndMenu();
                     }
-                    ImGui::MenuItem("Debug output", nullptr, &m_debugOutputWindow.Open);
+                    ImGui::MenuItem(locale.GetPhrase("menuVDPDebugOutput").data(), nullptr, &m_debugOutputWindow.Open);
                     ImGui::EndMenu();
                 }
-                if (ImGui::BeginMenu("Help")) {
-                    if (ImGui::MenuItem("Open welcome window", nullptr)) {
+                if (ImGui::BeginMenu(locale.GetPhrase("menuHelp").data())) {
+                    if (ImGui::MenuItem(locale.GetPhrase("menuHelpOpenWelcomeWin").data(), nullptr)) {
                         OpenWelcomeModal(false);
                     }
 
                     ImGui::Separator();
 #if Ymir_ENABLE_IMGUI_DEMO
-                    ImGui::MenuItem("ImGui demo window", nullptr, &showImGuiDemoWindow);
+                    ImGui::MenuItem(locale.GetPhrase("menuHelpImGuiWin").data(), nullptr, &showImGuiDemoWindow);
                     ImGui::Separator();
 #endif
-                    ImGui::MenuItem("About", nullptr, &m_aboutWindow.Open);
+                    ImGui::MenuItem(locale.GetPhrase("menuHelpAbout").data(), nullptr, &m_aboutWindow.Open);
                     ImGui::EndMenu();
                 }
                 ImGui::EndMainMenuBar();
@@ -2306,7 +2334,7 @@ void App::OpenWelcomeModal(bool scanIPLROMs) {
         util::IPLROMLoadResult result;
     };
 
-    OpenGenericModal("Welcome", [=, this, nextScanDeadline = clk::now() + kScanInterval,
+    OpenGenericModal(locale.GetPhrase("welcomeTitle").data(), [=, this, nextScanDeadline = clk::now() + kScanInterval,
                                  lastROMCount = m_context.romManager.GetIPLROMs().size(),
                                  romSelectResult = ROMSelectResult{}]() mutable {
         bool doSelectRom = false;
@@ -2320,27 +2348,27 @@ void App::OpenWelcomeModal(bool scanIPLROMs) {
         ImGui::TextUnformatted("Ymir");
         ImGui::PopFont();
         ImGui::PushFont(m_context.fonts.sansSerif.xlarge.regular);
-        ImGui::TextUnformatted("Welcome to Ymir!");
+        ImGui::TextUnformatted(locale.GetPhrase("welcomeMessage").data());
         ImGui::PopFont();
         ImGui::NewLine();
-        ImGui::TextUnformatted("Ymir requires a valid IPL (BIOS) ROM to work.");
+        ImGui::TextUnformatted(locale.GetPhrase("welcomeRequiresIPL").data());
 
         ImGui::NewLine();
-        ImGui::TextUnformatted("Ymir will automatically load IPL ROMs placed in ");
+        ImGui::TextUnformatted(locale.GetPhrase("welcomeAutomaticIPLLoad").data());
         ImGui::SameLine(0, 0);
         auto romPath = m_context.profile.GetPath(ProfilePath::IPLROMImages);
         if (ImGui::TextLink(fmt::format("{}", romPath).c_str())) {
             SDL_OpenURL(fmt::format("file:///{}", romPath).c_str());
         }
-        ImGui::TextUnformatted("Alternatively, you can ");
+        ImGui::TextUnformatted(locale.GetPhrase("welcomeAltIPL").data());
         ImGui::SameLine(0, 0);
-        if (ImGui::TextLink("manually select an IPL ROM")) {
+        if (ImGui::TextLink(locale.GetPhrase("welcomeManualIPLSelect").data())) {
             doSelectRom = true;
         }
         ImGui::SameLine(0, 0);
-        ImGui::TextUnformatted(" or ");
+        ImGui::TextUnformatted(locale.GetPhrase("welcomeOrIPL").data());
         ImGui::SameLine(0, 0);
-        if (ImGui::TextLink("manage the ROM settings in Settings > IPL")) {
+        if (ImGui::TextLink(locale.GetPhrase("welcomeManageROMSettings").data())) {
             doOpenSettings = true;
         }
         ImGui::SameLine(0, 0);
@@ -2348,9 +2376,9 @@ void App::OpenWelcomeModal(bool scanIPLROMs) {
 
         if (!activeScanning) {
             ImGui::NewLine();
-            ImGui::TextUnformatted("Ymir is not currently scanning for IPL ROMs.");
-            ImGui::TextUnformatted("If you would like to actively scan for IPL ROMs, press the button below.");
-            if (ImGui::Button("Start active scanning")) {
+            ImGui::TextUnformatted(locale.GetPhrase("welcomeNotScanning").data());
+            ImGui::TextUnformatted(locale.GetPhrase("welcomeScanInstructions").data());
+            if (ImGui::Button(locale.GetPhrase("welcomeStartScan").data())) {
                 activeScanning = true;
             }
             ImGui::NewLine();
@@ -2358,29 +2386,30 @@ void App::OpenWelcomeModal(bool scanIPLROMs) {
 
         if (romSelectResult.hasResult && !romSelectResult.result.succeeded) {
             ImGui::NewLine();
-            ImGui::Text("The file %s does not contain a valid IPL ROM.",
+            ImGui::Text(locale.GetPhrase("welcomeBadIPLROM").data(),
                         fmt::format("{}", romSelectResult.path).c_str());
-            ImGui::Text("Reason: %s.", romSelectResult.result.errorMessage.c_str());
+            ImGui::Text(locale.GetPhrase("welcomeBadIPLROMReason").data(), romSelectResult.result.errorMessage.c_str());
         }
 
         ImGui::Separator();
 
-        if (ImGui::Button("Open IPL ROMs directory")) {
-            SDL_OpenURL(fmt::format("file:///{}", m_context.profile.GetPath(ProfilePath::IPLROMImages)).c_str());
+        if (ImGui::Button(locale.GetPhrase("welcomeOpenIPLROMDir").data())) {
+            SDL_OpenURL(
+                fmt::format("file:///{}", m_context.profile.GetPath(ProfilePath::IPLROMImages)).c_str());
         }
         ImGui::SameLine();
-        if (ImGui::Button("Select IPL ROM...")) {
+        if (ImGui::Button(locale.GetPhrase("welcomeSelectIPLROM").data())) {
             doSelectRom = true;
         }
         ImGui::SameLine();
-        if (ImGui::Button("Open IPL settings")) {
+        if (ImGui::Button(locale.GetPhrase("welcomeOpenIPLSettings").data())) {
             doOpenSettings = true;
         }
         ImGui::SameLine(); // this places the OK button next to these
 
         if (doSelectRom) {
             FileDialogParams params{
-                .dialogTitle = "Select IPL ROM",
+                .dialogTitle = locale.GetPhrase("welcomeSelectIPLROMDialog").data(),
                 .defaultPath = m_context.profile.GetPath(ProfilePath::IPLROMImages),
                 .filters = {{"ROM files (*.bin, *.rom)", "bin;rom"}, {"All files (*.*)", "*"}},
                 .userdata = &romSelectResult,

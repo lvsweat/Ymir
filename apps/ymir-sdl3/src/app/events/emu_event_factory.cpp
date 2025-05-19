@@ -40,6 +40,10 @@ EmuEvent SetClockSpeed(sys::ClockSpeed clockSpeed) {
     return RunFunction([=](SharedContext &ctx) { ctx.saturn.SetClockSpeed(clockSpeed); });
 }
 
+EmuEvent SetLocale(core::config::sys::Locale locale) {
+    return RunFunction([=](SharedContext &ctx) { ctx.saturn.SetLocale(locale); });
+}
+
 EmuEvent SetVideoStandard(core::config::sys::VideoStandard videoStandard) {
     return RunFunction([=](SharedContext &ctx) { ctx.saturn.SetVideoStandard(videoStandard); });
 }

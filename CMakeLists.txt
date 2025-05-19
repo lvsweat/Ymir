@@ -4,6 +4,7 @@ project(Ymir VERSION 0.1.4)
 include(cmake/AddVersionDefines.cmake)
 include(cmake/CMakeRC.cmake)
 include(cmake/CopyRuntimeDLLs.cmake)
+include(cmake/CopyLocales.cmake)
 
 # CMake project structured adapted from Alex Reinking's SharedStaticStarter
 # GitHub: https://github.com/alexreinking/SharedStaticStarter

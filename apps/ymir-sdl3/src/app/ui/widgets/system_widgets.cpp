@@ -3,6 +3,7 @@
 #include <app/events/emu_event_factory.hpp>
 
 #include <util/regions.hpp>
+#include <util/i18n.hpp>
 
 #include <imgui.h>
 
@@ -36,6 +37,24 @@ bool RegionSelector(SharedContext &ctx) {
                 ctx.EnqueueEvent(events::emu::SetAreaCode(static_cast<uint8>(rgn)));
                 // TODO: optional?
                 ctx.EnqueueEvent(events::emu::HardReset());
+                changed = true;
+            }
+        }
+
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
+bool LocaleSelector(SharedContext &ctx) {
+    bool changed = false;
+    i18n::i18n& i18nInstance = i18n::i18n::GetInstance();
+    auto currentLocale = ctx.saturn.GetLocale();
+    if (ImGui::BeginCombo("##locale", i18n::i18n::LocaleToString(currentLocale).data(),
+                          ImGuiComboFlags_WidthFitPreview | ImGuiComboFlags_HeightLargest)) {
+        for (core::config::sys::Locale locale : i18nInstance.GetAvailableLocales()) {
+            if (ImGui::Selectable(i18n::i18n::LocaleToString(locale).data(), locale == currentLocale) && locale != currentLocale) {
+                ctx.EnqueueEvent(events::emu::SetLocale(locale));
                 changed = true;
             }
         }

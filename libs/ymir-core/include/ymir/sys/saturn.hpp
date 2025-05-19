@@ -52,6 +52,18 @@ struct Saturn {
     /// @brief Erases SMPC settings and does a hard reset.
     void FactoryReset();
 
+    /// @brief Retrieves the current locale used by the system.
+    /// @return the locale in use
+    [[nodiscard]] core::config::sys::Locale GetLocale() const noexcept {
+        return configuration.system.locale;
+    }
+
+    /// @brief Changes the locale to the specified language.
+    /// @param[in] locale is the new locale to use
+    void SetLocale(core::config::sys::Locale locale) {
+        configuration.system.locale = locale;
+    }
+
     /// @brief Retrieves the current video standard (NTSC or PAL) used by the system.
     /// @return the video standard in use
     [[nodiscard]] core::config::sys::VideoStandard GetVideoStandard() const noexcept {

@@ -35,6 +35,9 @@ struct Configuration {
         /// @brief Automatically change SMPC area code based on compatible regions from loaded discs.
         bool autodetectRegion = true;
 
+        /// @brief Prefered localization/language to use across Ymir's UI.
+        util::Observable<ymir::core::config::sys::Locale> locale = ymir::core::config::sys::Locale::en;
+
         /// @brief Preferred region order when autodetecting area codes.
         ///
         /// If none of these regions is supported by the disc, the first region listed on the disc is used.

@@ -8,6 +8,12 @@
 namespace ymir::core::config {
 
 namespace sys {
+    /// @brief Locales
+    enum class Locale {
+        en,
+        pt
+    };
+
     /// @brief System regions
     enum class Region {
         Japan = 0x1,        ///< (J) Domestic NTSC - Japan

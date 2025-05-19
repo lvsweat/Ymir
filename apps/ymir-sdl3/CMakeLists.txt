@@ -211,6 +211,8 @@ add_executable(ymir-sdl3
     src/util/regions.hpp
     src/util/ring_buffer.hpp
     src/util/sdl_file_dialog.hpp
+    src/util/i18n.cpp
+    src/util/i18n.hpp
 )
 add_executable(ymir::ymir-sdl3 ALIAS ymir-sdl3)
 set_target_properties(ymir-sdl3 PROPERTIES
@@ -231,6 +233,7 @@ target_link_libraries(ymir-sdl3 PRIVATE
     cereal::cereal
     lz4::lz4
     stb::stb
+    nlohmann_json
 )
 target_compile_features(ymir-sdl3 PUBLIC cxx_std_20)
 
@@ -250,6 +253,7 @@ cmrc_add_resource_library(ymir-sdl3-rc
 )
 
 cmrk_copy_runtime_dlls(ymir-sdl3)
+copy_locales(ymir-sdl3)
 
 ## Add icon
 if (WIN32)

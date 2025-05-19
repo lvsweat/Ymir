@@ -6,6 +6,7 @@
 
 #include <ymir/util/dev_log.hpp>
 #include <ymir/util/inline.hpp>
+#include <util/i18n.hpp>
 
 #include <cassert>
 
@@ -73,6 +74,17 @@ FORCE_INLINE static void Parse(toml::node_view<toml::node> &node, core::config::
             value = core::config::sys::Region::EuropePAL;
         } else if (*opt == "CentralSouthAmericaPAL"s) {
             value = core::config::sys::Region::EuropePAL;
+        }
+    }
+}
+
+FORCE_INLINE static void Parse(toml::node_view<toml::node> &node, core::config::sys::Locale &value) {
+    value = core::config::sys::Locale::en;
+    if (auto opt = node.value<std::string>()) {
+        if (*opt == "en"s) {
+            value = core::config::sys::Locale::en;
+        } else if (*opt == "pt"s) {
+            value = core::config::sys::Locale::pt;
         }
     }
 }
@@ -201,6 +213,14 @@ FORCE_INLINE static const char *ToTOML(const core::config::sys::Region value) {
     case core::config::sys::Region::Korea: return "AsiaNTSC";
     case core::config::sys::Region::AsiaPAL: return "EuropePAL";
     case core::config::sys::Region::CentralSouthAmericaPAL: return "EuropePAL";
+    }
+}
+
+FORCE_INLINE static const char *ToTOML(const core::config::sys::Locale value) {
+    switch (value) {
+    default: [[fallthrough]];
+    case core::config::sys::Locale::en: return "en";
+    case core::config::sys::Locale::pt: return "pt";
     }
 }
 
@@ -565,6 +585,7 @@ SettingsLoadResult Settings::Load(const std::filesystem::path &path) {
     }
 
     if (auto tblSystem = data["System"]) {
+        Parse(tblSystem, "Locale", emuConfig.system.locale);
         Parse(tblSystem, "VideoStandard", emuConfig.system.videoStandard);
         Parse(tblSystem, "AutoDetectRegion", emuConfig.system.autodetectRegion);
         Parse(tblSystem, "PreferredRegionOrder", emuConfig.system.preferredRegionOrder);
@@ -761,6 +782,7 @@ SettingsSaveResult Settings::Save() {
         }}},
 
         {"System", toml::table{{
+            {"Locale", ToTOML(i18n::i18n::GetInstance().GetCurrentLocale())},
             {"VideoStandard", ToTOML(emuConfig.system.videoStandard)},
             {"AutoDetectRegion", emuConfig.system.autodetectRegion},
             {"PreferredRegionOrder", ToTOML(emuConfig.system.preferredRegionOrder.Get())},
